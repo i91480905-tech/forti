@@ -9,17 +9,29 @@ export class EmergencyWeb extends WebPlugin implements EmergencyPlugin {
   // FIX: Correctly implement addListener to match the plugin interface and base class.
   // Using overloads to satisfy both the specific EmergencyPlugin interface
   // and the generic WebPlugin base class. The implementation signature
-  // is compatible with the base class, and the overload signature
-  // satisfies the plugin interface.
+  // uses a general function type to be compatible with all overloads.
   addListener(
     eventName: 'shakeDetected',
     listenerFunc: () => void,
   ): Promise<PluginListenerHandle>;
-  async addListener(
+  addListener(
     eventName: string,
     listenerFunc: ListenerCallback,
+  ): Promise<PluginListenerHandle>;
+  async addListener(
+    eventName: string,
+    listenerFunc: Function,
   ): Promise<PluginListenerHandle> {
-    return super.addListener(eventName, listenerFunc);
+    if (eventName === 'shakeDetected') {
+      // The public interface for 'shakeDetected' expects a no-argument function.
+      // We wrap the provided listener to match the internal ListenerCallback type,
+      // which expects one argument. This prevents type errors and aligns
+      // with how notifyListeners passes an empty object.
+      const wrapper: ListenerCallback = () => (listenerFunc as () => void)();
+      return super.addListener(eventName, wrapper);
+    }
+    // For any other event, pass it to the base implementation.
+    return super.addListener(eventName, listenerFunc as ListenerCallback);
   }
 
   async startMonitoring(): Promise<void> {
