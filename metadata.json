@@ -1,0 +1,7 @@
+{
+  "name": "FortiGuard",
+  "description": "A personal safety application that allows you to quickly send SOS messages with your location to pre-configured emergency contacts. It also provides quick access to helplines and safety resources.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
