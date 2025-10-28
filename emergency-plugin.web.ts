@@ -6,10 +6,8 @@ export class EmergencyWeb extends WebPlugin implements EmergencyPlugin {
   private lastShakeTime = 0;
   private readonly SHAKE_THRESHOLD = 25; // m/s^2
 
-  // FIX: Correctly implement addListener to match the plugin interface and base class.
   // Using overloads to satisfy both the specific EmergencyPlugin interface
-  // and the generic WebPlugin base class. The implementation signature
-  // uses a general function type to be compatible with all overloads.
+  // and the generic WebPlugin base class.
   addListener(
     eventName: 'shakeDetected',
     listenerFunc: () => void,
@@ -18,20 +16,17 @@ export class EmergencyWeb extends WebPlugin implements EmergencyPlugin {
     eventName: string,
     listenerFunc: ListenerCallback,
   ): Promise<PluginListenerHandle>;
+  // FIX: Implement `addListener` with a concrete type instead of `any` to avoid
+  // confusing the TypeScript compiler, which was causing it to lose type
+  // information for `this` in other methods.
   async addListener(
     eventName: string,
-    listenerFunc: Function,
+    listenerFunc: ListenerCallback,
   ): Promise<PluginListenerHandle> {
-    if (eventName === 'shakeDetected') {
-      // The public interface for 'shakeDetected' expects a no-argument function.
-      // We wrap the provided listener to match the internal ListenerCallback type,
-      // which expects one argument. This prevents type errors and aligns
-      // with how notifyListeners passes an empty object.
-      const wrapper: ListenerCallback = () => (listenerFunc as () => void)();
-      return super.addListener(eventName, wrapper);
-    }
-    // For any other event, pass it to the base implementation.
-    return super.addListener(eventName, listenerFunc as ListenerCallback);
+    // A function of type `() => void` is assignable to `ListenerCallback` (`(data: any) => void`).
+    // Therefore, we don't need the previous complex logic with a wrapper.
+    // We can just pass the listener to the super method.
+    return super.addListener(eventName, listenerFunc);
   }
 
   async startMonitoring(): Promise<void> {

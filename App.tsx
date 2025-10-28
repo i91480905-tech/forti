@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Geolocation } from '@capacitor/geolocation';
 import { Contact, View, UserProfile, Subscription, SubscriptionStatus, Discount } from './types';
 import Dashboard from './components/Dashboard';
 import ContactsList from './components/ContactsList';
@@ -34,15 +35,22 @@ const App: React.FC = () => {
   const sosMessageRef = useRef(sosMessage);
 
   useEffect(() => {
-    if (navigator.permissions) {
-        navigator.permissions.query({ name: 'geolocation' }).then(result => {
-            if (result.state === 'granted') setPermissionGranted('granted');
-            else if (result.state === 'prompt') setPermissionGranted('pending');
-            else setPermissionGranted('denied');
-        });
-    } else {
-        navigator.geolocation.getCurrentPosition(() => setPermissionGranted('granted'), () => setPermissionGranted('denied'));
-    }
+    const checkPermissions = async () => {
+      try {
+        const permissions = await Geolocation.checkPermissions();
+        if (permissions.location === 'granted') {
+          setPermissionGranted('granted');
+        } else if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
+          setPermissionGranted('pending');
+        } else {
+          setPermissionGranted('denied');
+        }
+      } catch (error) {
+        console.error('Error checking location permissions', error);
+        setPermissionGranted('denied');
+      }
+    };
+    checkPermissions();
   }, []);
 
   useEffect(() => {
@@ -50,27 +58,26 @@ const App: React.FC = () => {
     sosMessageRef.current = sosMessage;
   }, [contacts, sosMessage]);
 
-  const triggerSosFromShake = useCallback(() => {
+  const triggerSosFromShake = useCallback(async () => {
     const currentContacts = contactsRef.current;
     if (currentContacts.length === 0) {
         console.warn("Shake detected by native service, but no contacts are set up in the app.");
         return;
     }
     
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            const { latitude, longitude } = position.coords;
-            const locationUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-            const message = `${sosMessageRef.current}\nMy location: ${locationUrl}`;
-            setSosData({ message, contactNumbers: currentContacts.map(c => c.phone).join(',') });
-            setView('sosCountdown');
-        },
-        () => {
-            const message = `${sosMessageRef.current}\nLocation services failed.`;
-            setSosData({ message, contactNumbers: currentContacts.map(c => c.phone).join(',') });
-            setView('sosCountdown');
-        }
-    );
+    try {
+        const position = await Geolocation.getCurrentPosition();
+        const { latitude, longitude } = position.coords;
+        const locationUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        const message = `${sosMessageRef.current}\nMy location: ${locationUrl}`;
+        setSosData({ message, contactNumbers: currentContacts.map(c => c.phone).join(',') });
+        setView('sosCountdown');
+    } catch (error) {
+        console.error("Failed to get location for shake SOS:", error);
+        const message = `${sosMessageRef.current}\nLocation services failed.`;
+        setSosData({ message, contactNumbers: currentContacts.map(c => c.phone).join(',') });
+        setView('sosCountdown');
+    }
   }, []);
 
   useEffect(() => {
@@ -173,9 +180,7 @@ const App: React.FC = () => {
     if (!confirm(`This will send an SOS to ${contact.name} and then immediately call them. Continue?`)) return;
 
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => 
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
-      );
+      const position = await Geolocation.getCurrentPosition({ timeout: 10000 });
       const { latitude, longitude } = position.coords;
       const message = `${sosMessage}\nMy location: https://www.google.com/maps?q=${latitude},${longitude}`;
       await Emergency.sendSosAndCall({ recipient: contact.phone, message });
@@ -188,7 +193,25 @@ const App: React.FC = () => {
   };
 
   const makeHelplineCall = (number: string) => Emergency.makeCall({ number });
-  const requestLocationPermission = () => navigator.geolocation.getCurrentPosition(() => setPermissionGranted('granted'), () => setPermissionGranted('denied'));
+  
+  const requestLocationPermission = async () => {
+    try {
+      console.log('Attempting to request location permissions via Capacitor plugin...');
+      const permissions = await Geolocation.requestPermissions();
+      console.log('Capacitor permissions request returned:', permissions);
+      if (permissions.location === 'granted') {
+        setPermissionGranted('granted');
+      } else {
+        setPermissionGranted('denied');
+        alert('Location permission was denied. Please enable it in your phone settings to use this app.');
+      }
+    } catch (error: any) {
+      console.error('Error requesting location permissions', error);
+      alert(`Failed to request location permission. Error: ${error.message || 'An unknown error occurred.'}. This might happen if the app is not properly configured for native device features.`);
+      setPermissionGranted('denied');
+    }
+  };
+
   const handleBack = useCallback(() => setView('dashboard'), []);
   
   const handleSosConfirm = async () => {

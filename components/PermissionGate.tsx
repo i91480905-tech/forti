@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ShieldIcon } from '../constants';
 
@@ -22,7 +23,7 @@ const PermissionGate: React.FC<PermissionGateProps> = ({ onGrant }) => {
         Grant Permission
       </button>
       <p className="text-xs text-brand-text-secondary mt-4">
-        You may need to grant permission in your browser's settings.
+        You may need to grant permission in your phone's settings for this app.
       </p>
     </div>
   );

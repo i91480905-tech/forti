@@ -11,7 +11,8 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@capacitor/core": "^7.4.4"
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/geolocation": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
